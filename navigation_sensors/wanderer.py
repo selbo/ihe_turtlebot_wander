@@ -3,6 +3,9 @@ import rospy
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
 from kobuki_msgs.msg import BumperEvent 
+from std_msgs.msg import Empty
+
+
 
 class Scan_msg:
 
@@ -20,13 +23,25 @@ class Scan_msg:
         self.laser_cnt = 0
 
         rospy.Subscriber('/mobile_base/events/bumper', BumperEvent, self.bumper_callback)
+        rospy.Subscriber('/pause_navigation', Empty, self.pause_callback)
+        rospy.Subscriber('/resume_navigation', Empty, self.resume_callback)
 
         self.bumper = False
+        self.navigation_is_halted = False
+
+    def pause_callback(self, msg):
+        self.navigation_is_halted = True
+
+    def resume_callback(self, msg):
+        self.navigation_is_halted = False
+
 
     def bumper_callback(self, msg):
+        if self.navigation_is_halted:
+            return
         if self.bumper == True:
             return
-	if msg.state == 0:
+        if msg.state == 0:
             return 
         self.bumper = True
         msg = Twist()
@@ -37,9 +52,9 @@ class Scan_msg:
             print 'BUMPER'
             rospy.sleep(0.5)
             self.pub.publish(msg)
-	msg = Twist()
-	msg.angular.z = 1.2 
-	rospy.sleep(0.5)
+        msg = Twist()
+        msg.angular.z = 1.2 
+        rospy.sleep(0.5)
         self.pub.publish(msg)
         self.bumper = False
 
@@ -70,6 +85,8 @@ class Scan_msg:
  
     def for_callback(self,laserscan):
         self.laser_cnt = (self.laser_cnt + 1) % 25
+        if self.navigation_is_halted:
+            return
         if self.bumper == True:
             return
         if self.laser_cnt != 0:
