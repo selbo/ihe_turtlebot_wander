@@ -4,7 +4,7 @@ from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
 from kobuki_msgs.msg import BumperEvent 
 from std_msgs.msg import Empty
-
+import datetime
 
 
 class Scan_msg:
@@ -17,10 +17,12 @@ class Scan_msg:
         self.sect_1 = 0
         self.sect_2 = 0
         self.sect_3 = 0
-        self.ang = {0:0,001:-1.2,10:-1.2,11:-1.2,100:1.5,101:1.0,110:1.0,111:1.2}
+        self.ang = {0:0,001:-0.8,10:-0.8,11:-0.8,100:1.0,101:0.7,110:0.7,111:0.8}
         self.fwd = {0:.25,1:0,10:0,11:0,100:0.1,101:0,110:0,111:0}
         self.dbgmsg = {0:'Move forward',1:'Veer right',10:'Veer right',11:'Veer right',100:'Veer left',101:'Veer left',110:'Veer left',111:'Veer right'}
         self.laser_cnt = 0
+        self.last_obstacle_pause = datetime.datetime.now()
+
 
         rospy.Subscriber('/mobile_base/events/bumper', BumperEvent, self.bumper_callback)
         rospy.Subscriber('/pause_navigation', Empty, self.pause_callback)
@@ -76,11 +78,29 @@ class Scan_msg:
         sect = int(str(self.sect_1) + str(self.sect_2) + str(self.sect_3))
         rospy.loginfo("Sect = " + str(sect)) 
 
+        time_now = datetime.datetime.now()
+        delta = time_now - self.last_obstacle_pause
+
+
+        if self.ang[sect] != 0 and self.fwd[sect] == 0:
+            if delta.seconds > 5:
+                self.last_obstacle_pause = time_now
+
+                zero_msg = Twist()
+                rospy.sleep(0.5)
+                self.pub.publish(zero_msg)               
+                rospy.sleep(2)
+
+
         if self.fwd[sect] != 0 or self.ang[sect] != 0:
+
             self.msg.angular.z = self.ang[sect]
             self.msg.linear.x = self.fwd[sect]
             rospy.loginfo(self.dbgmsg[sect])
             self.pub.publish(self.msg)
+
+            #rospy.sleep(1)
+
         self.reset_sect()
  
     def for_callback(self,laserscan):
