@@ -27,9 +27,16 @@ class Scan_msg:
         rospy.Subscriber('/mobile_base/events/bumper', BumperEvent, self.bumper_callback)
         rospy.Subscriber('/pause_navigation', Empty, self.pause_callback)
         rospy.Subscriber('/resume_navigation', Empty, self.resume_callback)
+        rospy.Subscriber('/cmd_vel', Twist, self.cmd_vel_callback)
+
+        self.last_cmd_vel = None
 
         self.bumper = False
         self.navigation_is_halted = False
+
+    def cmd_vel_callback(self, msg):
+        self.last_cmd_vel = datetime.datetime.now()
+
 
     def pause_callback(self, msg):
         self.navigation_is_halted = True
@@ -80,6 +87,10 @@ class Scan_msg:
 
         time_now = datetime.datetime.now()
         delta = time_now - self.last_obstacle_pause
+        if self.last_cmd_vel != None:
+            delta2 = time_now - self.last_cmd_vel
+            if delta2.seconds < 3:
+                return
 
 
         if self.ang[sect] != 0 and self.fwd[sect] == 0:
